@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Micro-Structure Predictor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d0f14;
+      --surface:  #151820;
+      --border:   #222635;
+      --accent:   #4f8ef7;
+      --green:    #34d399;
+      --red:      #f87171;
+      --yellow:   #fbbf24;
+      --muted:    #6b7280;
+      --text:     #e2e8f0;
+      --subtext:  #94a3b8;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    header .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      padding: 0.2rem 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    header h1 {
+      font-size: 1.9rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    header p {
+      margin-top: 0.4rem;
+      color: var(--subtext);
+      font-size: 0.9rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.75rem;
+      width: 100%;
+      max-width: 680px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1.05rem;
+      padding: 0.7rem 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    input[type="text"]:focus { border-color: var(--accent); }
+    input[type="text"]::placeholder { color: var(--muted); text-transform: none; letter-spacing: normal; }
+
+    button#analyzeBtn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.7rem 1.5rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    button#analyzeBtn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+    button#analyzeBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Context window display */
+    #contextPanel {
+      display: none;
+      margin-top: 1.5rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+    }
+
+    #contextPanel h3 {
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.9rem;
+    }
+
+    .ctx-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem 1.5rem;
+    }
+
+    .ctx-item { font-size: 0.85rem; }
+    .ctx-item .label { color: var(--muted); margin-bottom: 0.1rem; font-size: 0.75rem; }
+    .ctx-item .value { color: var(--text); font-weight: 500; }
+
+    /* Loader */
+    #loader {
+      display: none;
+      margin-top: 1.5rem;
+      text-align: center;
+      color: var(--subtext);
+      font-size: 0.9rem;
+    }
+
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 0.6rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Result */
+    #resultPanel {
+      display: none;
+      margin-top: 1.5rem;
+    }
+
+    #resultPanel h3 {
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    .prediction-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      font-size: 0.88rem;
+      line-height: 1.75;
+      color: var(--text);
+    }
+
+    /* Markdown-like rendering */
+    .prediction-box h2 { font-size: 1rem; color: #fff; margin: 1rem 0 0.4rem; }
+    .prediction-box h3 { font-size: 0.92rem; color: var(--accent); margin: 0.9rem 0 0.3rem; }
+    .prediction-box strong { color: var(--green); }
+    .prediction-box em { color: var(--yellow); font-style: normal; }
+    .prediction-box ul, .prediction-box ol { padding-left: 1.3rem; }
+    .prediction-box li { margin-bottom: 0.25rem; }
+    .prediction-box hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+    .prediction-box p { margin-bottom: 0.5rem; }
+    .prediction-box code {
+      background: #1e2130;
+      border-radius: 4px;
+      padding: 0.1rem 0.35rem;
+      font-size: 0.82rem;
+      color: var(--yellow);
+    }
+
+    /* Error */
+    #errorMsg {
+      display: none;
+      margin-top: 1rem;
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: var(--red);
+      font-size: 0.875rem;
+    }
+
+    footer {
+      margin-top: 2.5rem;
+      color: var(--muted);
+      font-size: 0.75rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Transformer Engine · Market Micro-Structure</div>
+  <h1>Next Token Predictor</h1>
+  <p>Enter a ticker to sequence-predict the next trade execution outcome</p>
+</header>
+
+<div class="card">
+  <div class="input-row">
+    <input type="text" id="tickerInput" placeholder="e.g. AAPL, TSLA, SPY…" maxlength="10" />
+    <button id="analyzeBtn" onclick="analyze()">Analyze</button>
+  </div>
+
+  <div id="errorMsg"></div>
+
+  <div id="contextPanel">
+    <h3>Context Window</h3>
+    <div class="ctx-grid">
+      <div class="ctx-item">
+        <div class="label">Ticker / Price</div>
+        <div class="value" id="ctx-ticker">—</div>
+      </div>
+      <div class="ctx-item">
+        <div class="label">Last 3 Candles</div>
+        <div class="value" id="ctx-candles">—</div>
+      </div>
+      <div class="ctx-item">
+        <div class="label">Order Book Imbalance</div>
+        <div class="value" id="ctx-ob">—</div>
+      </div>
+      <div class="ctx-item">
+        <div class="label">Volatility (ATR)</div>
+        <div class="value" id="ctx-atr">—</div>
+      </div>
+      <div class="ctx-item" style="grid-column: 1 / -1">
+        <div class="label">Price vs. VWAP</div>
+        <div class="value" id="ctx-vwap">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="loader">
+    <div class="spinner"></div>
+    Running sequence prediction…
+  </div>
+
+  <div id="resultPanel">
+    <h3>Prediction Output</h3>
+    <div class="prediction-box" id="predictionContent"></div>
+  </div>
+</div>
+
+<footer>Data via Yahoo Finance · Model: Claude Opus 4.6 · For educational purposes only</footer>
+
+<script>
+  const input = document.getElementById("tickerInput");
+  input.addEventListener("keydown", e => { if (e.key === "Enter") analyze(); });
+
+  function setError(msg) {
+    const el = document.getElementById("errorMsg");
+    el.textContent = msg;
+    el.style.display = msg ? "block" : "none";
+  }
+
+  function showLoader(on) {
+    document.getElementById("loader").style.display = on ? "block" : "none";
+    document.getElementById("analyzeBtn").disabled = on;
+  }
+
+  function renderMarkdown(text) {
+    return text
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      // headings
+      .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+      .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+      .replace(/^# (.+)$/gm, "<h2>$1</h2>")
+      // bold / italic
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g, "<em>$1</em>")
+      // inline code
+      .replace(/`(.+?)`/g, "<code>$1</code>")
+      // horizontal rule
+      .replace(/^---$/gm, "<hr>")
+      // unordered lists (simple)
+      .replace(/^[-•] (.+)$/gm, "<li>$1</li>")
+      // numbered lists
+      .replace(/^\d+\. (.+)$/gm, "<li>$1</li>")
+      // paragraphs (double newline)
+      .replace(/\n{2,}/g, "</p><p>")
+      .replace(/\n/g, "<br>")
+      .replace(/^/, "<p>").replace(/$/, "</p>")
+      // wrap consecutive <li> in <ul>
+      .replace(/(<li>[\s\S]*?<\/li>)/g, "<ul>$1</ul>")
+      // clean up empty <p>
+      .replace(/<p>\s*<\/p>/g, "");
+  }
+
+  async function analyze() {
+    const ticker = input.value.trim().toUpperCase();
+    if (!ticker) { setError("Please enter a ticker symbol."); return; }
+
+    setError("");
+    document.getElementById("contextPanel").style.display = "none";
+    document.getElementById("resultPanel").style.display = "none";
+    showLoader(true);
+
+    try {
+      const res = await fetch("/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticker })
+      });
+      const data = await res.json();
+
+      if (!res.ok) { setError(data.error || "An error occurred."); return; }
+
+      // Populate context panel
+      const ctx = data.context;
+      document.getElementById("ctx-ticker").textContent  = `${ctx.ticker} — $${ctx.price}`;
+      document.getElementById("ctx-candles").textContent = ctx.candles;
+      document.getElementById("ctx-ob").textContent      = ctx.ob;
+      document.getElementById("ctx-atr").textContent     = ctx.atr;
+      document.getElementById("ctx-vwap").textContent    = ctx.vwap;
+      document.getElementById("contextPanel").style.display = "block";
+
+      // Render prediction
+      document.getElementById("predictionContent").innerHTML = renderMarkdown(data.prediction);
+      document.getElementById("resultPanel").style.display = "block";
+
+    } catch (e) {
+      setError("Network error — is the server running?");
+    } finally {
+      showLoader(false);
+    }
+  }
+</script>
+</body>
+</html>
